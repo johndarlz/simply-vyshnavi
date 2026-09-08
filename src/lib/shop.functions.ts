@@ -155,9 +155,9 @@ export const createOrder = createServerFn({ method: "POST" })
     }
     const total = subtotal + shipping + cod;
 
-    const seqRes = await supabaseAdmin.rpc("next_order_number" as never);
+    const seqRes = await supabaseAdmin.rpc("next_order_number");
     const orderNumber =
-      typeof seqRes.data === "string"
+      typeof seqRes.data === "string" && seqRes.data
         ? seqRes.data
         : "VC" +
           new Date().toISOString().slice(0, 10).replace(/-/g, "") +
