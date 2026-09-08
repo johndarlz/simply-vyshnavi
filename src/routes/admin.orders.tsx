@@ -31,7 +31,13 @@ function OrdersPage() {
   const open = orders.find((o) => o.id === openId) ?? null;
 
   const update = useMutation({
-    mutationFn: (vars: Parameters<typeof adminUpdateOrder>[0]["data"]) => adminUpdateOrder({ data: vars }),
+    mutationFn: (vars: {
+      id: string;
+      order_status?: string;
+      payment_status?: string;
+      tracking_number?: string;
+      admin_notes?: string;
+    }) => adminUpdateOrder({ data: vars }),
     onSuccess: () => {
       toast.success("Order updated");
       void qc.invalidateQueries({ queryKey: ["admin", "orders"] });
