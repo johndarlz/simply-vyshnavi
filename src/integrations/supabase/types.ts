@@ -427,6 +427,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      next_order_number: { Args: never; Returns: string }
     }
     Enums: {
       app_role: "admin"
