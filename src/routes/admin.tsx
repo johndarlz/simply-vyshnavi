@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link, Outlet, useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { adminWhoami } from "@/lib/admin.functions";
+import { adminExists, adminWhoami, bootstrapAdmin } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin")({
   ssr: false,
@@ -114,10 +114,26 @@ function AdminLogin({ denied, onSignedIn }: { denied: boolean; onSignedIn: () =>
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [needsSetup, setNeedsSetup] = useState(false);
+
+  useEffect(() => {
+    void adminExists()
+      .then((r) => setNeedsSetup(!r.exists))
+      .catch(() => setNeedsSetup(false));
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
+    if (needsSetup) {
+      const res = await bootstrapAdmin({ data: { email, password } }).catch(() => null);
+      if (!res?.ok) {
+        setBusy(false);
+        toast.error(res?.error ?? "Could not create the admin account.");
+        return;
+      }
+      setNeedsSetup(false);
+    }
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) {
@@ -127,11 +143,18 @@ function AdminLogin({ denied, onSignedIn }: { denied: boolean; onSignedIn: () =>
     onSignedIn();
   };
 
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-secondary/40 px-4">
       <form onSubmit={submit} className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-soft">
-        <p className="font-display text-2xl">Admin Login</p>
+        <p className="font-display text-2xl">{needsSetup ? "Create Admin Account" : "Admin Login"}</p>
         <p className="mt-1 text-xs tracking-luxe text-muted-foreground">VYSHNAVI COLLECTIONS</p>
+        {needsSetup ? (
+          <p className="mt-4 rounded-md bg-secondary p-3 text-xs text-muted-foreground">
+            No admin exists yet. Choose the email and password you will use to manage the store (at least 8
+            characters).
+          </p>
+        ) : null}
         {denied ? (
           <p className="mt-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
             This account does not have admin access.
@@ -158,7 +181,7 @@ function AdminLogin({ denied, onSignedIn }: { denied: boolean; onSignedIn: () =>
           disabled={busy}
           className="mt-5 w-full rounded-md bg-primary py-3 text-sm font-medium text-primary-foreground disabled:opacity-50"
         >
-          {busy ? "Signing in…" : "Sign In"}
+          {busy ? "Please wait…" : needsSetup ? "Create Admin Account" : "Sign In"}
         </button>
         {denied ? (
           <button

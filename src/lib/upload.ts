@@ -10,5 +10,10 @@ export async function uploadMedia(file: File): Promise<string> {
     upsert: false,
   });
   if (error) throw error;
-  return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+  // Bucket is private, so hand back a long-lived signed URL (10 years).
+  const { data: signed, error: signError } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+  if (signError || !signed) throw signError ?? new Error("Could not create media URL");
+  return signed.signedUrl;
 }
