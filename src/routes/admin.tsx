@@ -147,8 +147,14 @@ function AdminLogin({ denied, onSignedIn }: { denied: boolean; onSignedIn: () =>
   return (
     <div className="flex min-h-screen items-center justify-center bg-secondary/40 px-4">
       <form onSubmit={submit} className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-soft">
-        <p className="font-display text-2xl">Admin Login</p>
+        <p className="font-display text-2xl">{needsSetup ? "Create Admin Account" : "Admin Login"}</p>
         <p className="mt-1 text-xs tracking-luxe text-muted-foreground">VYSHNAVI COLLECTIONS</p>
+        {needsSetup ? (
+          <p className="mt-4 rounded-md bg-secondary p-3 text-xs text-muted-foreground">
+            No admin exists yet. Choose the email and password you will use to manage the store (at least 8
+            characters).
+          </p>
+        ) : null}
         {denied ? (
           <p className="mt-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
             This account does not have admin access.
