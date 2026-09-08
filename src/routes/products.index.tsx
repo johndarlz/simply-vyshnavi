@@ -4,7 +4,7 @@ import { StoreShell } from "@/components/store/StoreShell";
 import { ProductCard } from "@/components/store/ProductCard";
 import { categoriesQuery, productsQuery } from "@/lib/store-data";
 
-type Search = { q?: string; category?: string; sort?: string };
+type Search = { q?: string | undefined; category?: string | undefined; sort?: string | undefined };
 
 export const Route = createFileRoute("/products/")({
   validateSearch: (search: Record<string, unknown>): Search => ({
@@ -28,12 +28,12 @@ export const Route = createFileRoute("/products/")({
 
 function ProductsPage() {
   const search = Route.useSearch();
-  const navigate = useNavigate({ from: "/products" });
+  const navigate = useNavigate({ from: "/products/" });
   const { data: products, isPending } = useQuery(productsQuery);
   const { data: categories } = useQuery(categoriesQuery);
 
   const setSearch = (patch: Partial<Search>) =>
-    navigate({ search: (prev) => ({ ...prev, ...patch }) });
+    navigate({ search: (prev: Search) => ({ ...prev, ...patch }) });
 
   const term = (search.q ?? "").toLowerCase().trim();
   const categoryId = categories?.find((c) => c.slug === search.category)?.id;

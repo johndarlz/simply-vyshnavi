@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check, Copy, MessageCircle, Share2 } from "lucide-react";
+import { Check, MessageCircle, Share2 } from "lucide-react";
 import { StoreShell } from "@/components/store/StoreShell";
 import { getProduct } from "@/lib/shop.functions";
 import { settingsQuery } from "@/lib/store-data";
@@ -62,7 +62,8 @@ function ProductPage() {
   }, [product]);
 
   const variantGroups = useMemo(() => {
-    const groups: Record<string, typeof product.product_variants> = {};
+    type Variant = NonNullable<typeof product>["product_variants"][number];
+    const groups: Record<string, Variant[]> = {};
     for (const v of product?.product_variants ?? []) {
       groups[v.type] = [...(groups[v.type] ?? []), v];
     }
@@ -377,8 +378,8 @@ function ShareRow({ name, url, whatsappNumber }: { name: string; url: string; wh
         }}
         className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-secondary"
       >
-        {copied ? <Check className="h-4 w-4" /> : navigator.share ? <Share2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-        {copied ? "Copied" : "Copy link"}
+        {copied ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
+        {copied ? "Copied" : "Share link"}
       </button>
     </div>
   );
