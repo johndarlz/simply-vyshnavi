@@ -114,10 +114,26 @@ function AdminLogin({ denied, onSignedIn }: { denied: boolean; onSignedIn: () =>
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [needsSetup, setNeedsSetup] = useState(false);
+
+  useEffect(() => {
+    void adminExists()
+      .then((r) => setNeedsSetup(!r.exists))
+      .catch(() => setNeedsSetup(false));
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
+    if (needsSetup) {
+      const res = await bootstrapAdmin({ data: { email, password } }).catch(() => null);
+      if (!res?.ok) {
+        setBusy(false);
+        toast.error(res?.error ?? "Could not create the admin account.");
+        return;
+      }
+      setNeedsSetup(false);
+    }
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) {
@@ -126,6 +142,7 @@ function AdminLogin({ denied, onSignedIn }: { denied: boolean; onSignedIn: () =>
     }
     onSignedIn();
   };
+
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-secondary/40 px-4">
