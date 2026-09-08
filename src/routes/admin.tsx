@@ -181,7 +181,7 @@ function AdminLogin({ denied, onSignedIn }: { denied: boolean; onSignedIn: () =>
           disabled={busy}
           className="mt-5 w-full rounded-md bg-primary py-3 text-sm font-medium text-primary-foreground disabled:opacity-50"
         >
-          {busy ? "Signing in…" : "Sign In"}
+          {busy ? "Please wait…" : needsSetup ? "Create Admin Account" : "Sign In"}
         </button>
         {denied ? (
           <button
