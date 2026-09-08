@@ -258,8 +258,12 @@ export const adminUpdateOrder = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const db = await adminDb(context);
-    const { id, ...rest } = data;
-    await db.from("orders").update(rest).eq("id", id);
+    const patch: Record<string, string> = {};
+    if (data.order_status !== undefined) patch["order_status"] = data.order_status;
+    if (data.payment_status !== undefined) patch["payment_status"] = data.payment_status;
+    if (data.tracking_number !== undefined) patch["tracking_number"] = data.tracking_number;
+    if (data.admin_notes !== undefined) patch["admin_notes"] = data.admin_notes;
+    await db.from("orders").update(patch).eq("id", data.id);
     return { ok: true as const };
   });
 
