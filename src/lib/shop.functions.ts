@@ -150,8 +150,12 @@ export const createOrder = createServerFn({ method: "POST" })
     if (data.paymentMethod === "cod" && settings["cod_enabled"] !== "true") {
       return { ok: false as const, error: "Cash on delivery is currently unavailable." };
     }
+    const razorpayKeyId = process.env["RAZORPAY_KEY_ID"];
+    const razorpayKeySecret = process.env["RAZORPAY_KEY_SECRET"];
     if (data.paymentMethod === "online") {
-      return { ok: false as const, error: "Online payment is not enabled yet. Please choose Cash on Delivery." };
+      if (settings["online_payment_enabled"] !== "true" || !razorpayKeyId || !razorpayKeySecret) {
+        return { ok: false as const, error: "Online payment is unavailable right now. Please choose Cash on Delivery." };
+      }
     }
     const total = subtotal + shipping + cod;
 
