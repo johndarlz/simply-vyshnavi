@@ -10,6 +10,7 @@ import {
   adminSetProductActive,
   type AdminProduct,
 } from "@/lib/admin.functions";
+import { aiFillProduct } from "@/lib/ai-product.functions";
 import { inr, slugify } from "@/lib/format";
 import { uploadMedia } from "@/lib/upload";
 
@@ -264,8 +265,60 @@ function ProductForm({
 }) {
   const [draft, setDraft] = useState<Draft>(initial);
   const [uploading, setUploading] = useState(false);
+  const [aiNotes, setAiNotes] = useState("");
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((d) => ({ ...d, [key]: value }));
+
+  const aiFill = useMutation({
+    mutationFn: () =>
+      aiFillProduct({
+        data: {
+          notes: aiNotes,
+          imageUrls: draft.images.slice(0, 3),
+          categories: categories.map((c) => c.name),
+        },
+      }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      const a = res.draft;
+      setDraft((d) => {
+        const cat = categories.find((c) => c.name.toLowerCase() === a.category.trim().toLowerCase());
+        const pick = (next: string, cur: string) => (next.trim() ? next.trim() : cur);
+        return {
+          ...d,
+          name: pick(a.name, d.name),
+          slug: d.slug || slugify(a.name || d.name),
+          sku: pick(a.sku, d.sku),
+          description: pick(a.description, d.description),
+          category_id: d.category_id || cat?.id || "",
+          price: a.price > 0 ? a.price : d.price,
+          original_price: a.original_price > 0 ? a.original_price : d.original_price,
+          material: pick(a.material, d.material),
+          dimensions: pick(a.dimensions, d.dimensions),
+          weight: pick(a.weight, d.weight),
+          care_instructions: pick(a.care_instructions, d.care_instructions),
+          delivery_info: pick(a.delivery_info, d.delivery_info),
+          seo_title: pick(a.seo_title, d.seo_title),
+          seo_description: pick(a.seo_description, d.seo_description),
+          variants: d.variants.length
+            ? d.variants
+            : a.variants.map((v) => ({
+                type: v.type,
+                name: v.name,
+                price_adjustment: 0,
+                stock: 0,
+                sku: "",
+              })),
+        };
+      });
+      toast.success("Details filled in. Please review before publishing.");
+    },
+    onError: () => toast.error("Something went wrong. Please try again."),
+  });
+
 
   const save = useMutation({
     mutationFn: () =>
