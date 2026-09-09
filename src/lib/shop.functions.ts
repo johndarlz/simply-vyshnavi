@@ -186,8 +186,8 @@ export const createOrder = createServerFn({ method: "POST" })
         discount: 0,
         total,
         payment_method: data.paymentMethod,
-        payment_status: data.paymentMethod === "cod" ? "pending" : "paid",
-        order_status: "pending",
+        payment_status: "pending",
+        order_status: data.paymentMethod === "online" ? "awaiting_payment" : "pending",
       })
       .select("id, order_number")
       .single();
@@ -196,15 +196,128 @@ export const createOrder = createServerFn({ method: "POST" })
 
     await supabaseAdmin.from("order_items").insert(items.map((i) => ({ ...i, order_id: order.id })));
 
-    for (const line of data.items) {
-      const p = products.find((x) => x.id === line.productId)!;
-      await supabaseAdmin
-        .from("products")
-        .update({ stock: Math.max(0, p.stock - line.quantity) })
-        .eq("id", p.id);
+    if (data.paymentMethod === "cod") {
+      for (const line of data.items) {
+        const p = products.find((x) => x.id === line.productId)!;
+        await supabaseAdmin
+          .from("products")
+          .update({ stock: Math.max(0, p.stock - line.quantity) })
+          .eq("id", p.id);
+      }
+      return { ok: true as const, orderNumber: order.order_number, payment: null };
+    }
+
+    // Online payment: create a Razorpay order server-side.
+    const rzpRes = await fetch("https://api.razorpay.com/v1/orders", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Basic " + btoa(`${razorpayKeyId}:${razorpayKeySecret}`),
+      },
+      body: JSON.stringify({
+        amount: Math.round(total * 100),
+        currency: "INR",
+        receipt: order.order_number,
+        notes: { order_number: order.order_number },
+      }),
+    });
+
+    if (!rzpRes.ok) {
+      await supabaseAdmin.from("orders").update({ order_status: "cancelled" }).eq("id", order.id);
+      return { ok: false as const, error: "Could not start the payment. Please try again." };
+    }
+
+    const rzpOrder = (await rzpRes.json()) as { id: string; amount: number };
+    await supabaseAdmin.from("orders").update({ payment_id: rzpOrder.id }).eq("id", order.id);
+
+    return {
+      ok: true as const,
+      orderNumber: order.order_number,
+      payment: {
+        keyId: razorpayKeyId!,
+        razorpayOrderId: rzpOrder.id,
+        amount: rzpOrder.amount,
+        name: settings["store_name"] || "Vyshnavi Collections",
+        description: `Order ${order.order_number}`,
+        prefill: {
+          name: data.customer.name,
+          contact: data.customer.phone,
+          email: data.customer.email || "",
+        },
+      },
+    };
+  });
+
+async function hmacSha256Hex(secret: string, message: string) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
+    "sign",
+  ]);
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
+  return Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+export const verifyPayment = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        orderNumber: z.string().trim().min(4).max(40),
+        razorpayOrderId: z.string().trim().max(120),
+        razorpayPaymentId: z.string().trim().max(120),
+        razorpaySignature: z.string().trim().max(200),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) => {
+    const secret = process.env["RAZORPAY_KEY_SECRET"];
+    if (!secret) return { ok: false as const, error: "Payment verification is unavailable." };
+
+    const expected = await hmacSha256Hex(secret, `${data.razorpayOrderId}|${data.razorpayPaymentId}`);
+    if (expected !== data.razorpaySignature) return { ok: false as const, error: "Payment could not be verified." };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: order } = await supabaseAdmin
+      .from("orders")
+      .select("id, order_number, payment_id, payment_status, order_items(product_id, quantity)")
+      .eq("order_number", data.orderNumber.toUpperCase())
+      .maybeSingle();
+
+    if (!order || order.payment_id !== data.razorpayOrderId) {
+      return { ok: false as const, error: "Payment could not be matched to your order." };
+    }
+    if (order.payment_status === "paid") return { ok: true as const, orderNumber: order.order_number };
+
+    await supabaseAdmin
+      .from("orders")
+      .update({ payment_status: "paid", order_status: "confirmed", payment_id: data.razorpayPaymentId })
+      .eq("id", order.id);
+
+    for (const item of order.order_items ?? []) {
+      if (!item.product_id) continue;
+      const { data: p } = await supabaseAdmin.from("products").select("stock").eq("id", item.product_id).maybeSingle();
+      if (p) {
+        await supabaseAdmin
+          .from("products")
+          .update({ stock: Math.max(0, p.stock - item.quantity) })
+          .eq("id", item.product_id);
+      }
     }
 
     return { ok: true as const, orderNumber: order.order_number };
+  });
+
+export const cancelPendingPayment = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({ orderNumber: z.string().trim().min(4).max(40) }).parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin
+      .from("orders")
+      .update({ order_status: "cancelled" })
+      .eq("order_number", data.orderNumber.toUpperCase())
+      .eq("payment_status", "pending");
+    return { ok: true as const };
   });
 
 export const trackOrder = createServerFn({ method: "POST" })
