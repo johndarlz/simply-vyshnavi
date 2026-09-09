@@ -457,6 +457,30 @@ function ProductForm({
         {uploading ? <p className="mt-2 text-xs text-muted-foreground">Uploading…</p> : null}
       </Card>
 
+      <Card title="Fill Details with AI">
+        <p className="text-xs text-muted-foreground">
+          Upload the product photo above, paste whatever details you have (price, size, fabric, colours), then let AI
+          write the rest. You can edit everything afterwards.
+        </p>
+        <textarea
+          value={aiNotes}
+          onChange={(e) => setAiNotes(e.target.value)}
+          rows={5}
+          placeholder="e.g. Kanchipuram silk saree, maroon with gold zari border, 6.3 m with blouse piece, price 4500, was 5200, dry clean only"
+          className="mt-3 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+        />
+        <button
+          type="button"
+          onClick={() => aiFill.mutate()}
+          disabled={aiFill.isPending}
+          className="mt-3 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-60"
+        >
+          {aiFill.isPending ? "Writing details…" : "Fill details with AI"}
+        </button>
+      </Card>
+
+
+
       <Card title="Basic Information">
         <Grid>
           <Text label="Product Name" required value={draft.name} onChange={(v) => set("name", v)} />
