@@ -103,6 +103,56 @@ function CheckoutPage() {
         toast.error(result.error);
         return;
       }
+
+      if (result.payment) {
+        const pay = result.payment;
+        const loaded = await loadRazorpay();
+        if (!loaded || !window.Razorpay) {
+          await cancelPayment({ data: { orderNumber: result.orderNumber } });
+          toast.error("Could not open the payment window. Please check your connection and try again.");
+          return;
+        }
+        const rzp = new window.Razorpay({
+          key: pay.keyId,
+          amount: pay.amount,
+          currency: "INR",
+          name: pay.name,
+          description: pay.description,
+          order_id: pay.razorpayOrderId,
+          prefill: pay.prefill,
+          theme: { color: "#7d2b3f" },
+          modal: {
+            ondismiss: () => {
+              void cancelPayment({ data: { orderNumber: result.orderNumber } });
+              setBusy(false);
+              toast.error("Payment cancelled. Your order was not placed.");
+            },
+          },
+          handler: (response: RazorpayHandlerResponse) => {
+            void (async () => {
+              const verified = await confirmPayment({
+                data: {
+                  orderNumber: result.orderNumber,
+                  razorpayOrderId: response.razorpay_order_id,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpaySignature: response.razorpay_signature,
+                },
+              });
+              if (!verified.ok) {
+                toast.error(verified.error);
+                setBusy(false);
+                return;
+              }
+              clear();
+              toast.success("Payment successful");
+              navigate({ to: "/order-success/$orderNumber", params: { orderNumber: result.orderNumber } });
+            })();
+          },
+        });
+        rzp.open();
+        return;
+      }
+
       clear();
       toast.success("Order placed successfully");
       navigate({ to: "/order-success/$orderNumber", params: { orderNumber: result.orderNumber } });
