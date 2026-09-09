@@ -50,6 +50,8 @@ function CheckoutPage() {
   const { items, subtotal, maxCodCharge, clear } = useCart();
   const { data: settings } = useQuery(settingsQuery);
   const submitOrder = useServerFn(createOrder);
+  const confirmPayment = useServerFn(verifyPayment);
+  const cancelPayment = useServerFn(cancelPendingPayment);
   const navigate = useNavigate();
   const [sameWhatsapp, setSameWhatsapp] = useState(true);
   const [method, setMethod] = useState<"cod" | "online">("cod");
