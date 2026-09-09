@@ -87,6 +87,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:site_name", content: "Vyshnavi Collections" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "google-site-verification", content: "aOSTBo_pbCNlRf0mzCXgcGew18bYV3Wy-iQhVE9CjQk" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
