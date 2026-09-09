@@ -7,7 +7,31 @@ import { StoreShell } from "@/components/store/StoreShell";
 import { useCart } from "@/lib/cart";
 import { inr } from "@/lib/format";
 import { settingsQuery } from "@/lib/store-data";
-import { createOrder } from "@/lib/shop.functions";
+import { cancelPendingPayment, createOrder, verifyPayment } from "@/lib/shop.functions";
+
+type RazorpayHandlerResponse = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+};
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
+  }
+}
+
+function loadRazorpay(): Promise<boolean> {
+  if (typeof window === "undefined") return Promise.resolve(false);
+  if (window.Razorpay) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({
@@ -26,6 +50,8 @@ function CheckoutPage() {
   const { items, subtotal, maxCodCharge, clear } = useCart();
   const { data: settings } = useQuery(settingsQuery);
   const submitOrder = useServerFn(createOrder);
+  const confirmPayment = useServerFn(verifyPayment);
+  const cancelPayment = useServerFn(cancelPendingPayment);
   const navigate = useNavigate();
   const [sameWhatsapp, setSameWhatsapp] = useState(true);
   const [method, setMethod] = useState<"cod" | "online">("cod");
@@ -79,6 +105,56 @@ function CheckoutPage() {
         toast.error(result.error);
         return;
       }
+
+      if (result.payment) {
+        const pay = result.payment;
+        const loaded = await loadRazorpay();
+        if (!loaded || !window.Razorpay) {
+          await cancelPayment({ data: { orderNumber: result.orderNumber } });
+          toast.error("Could not open the payment window. Please check your connection and try again.");
+          return;
+        }
+        const rzp = new window.Razorpay({
+          key: pay.keyId,
+          amount: pay.amount,
+          currency: "INR",
+          name: pay.name,
+          description: pay.description,
+          order_id: pay.razorpayOrderId,
+          prefill: pay.prefill,
+          theme: { color: "#7d2b3f" },
+          modal: {
+            ondismiss: () => {
+              void cancelPayment({ data: { orderNumber: result.orderNumber } });
+              setBusy(false);
+              toast.error("Payment cancelled. Your order was not placed.");
+            },
+          },
+          handler: (response: RazorpayHandlerResponse) => {
+            void (async () => {
+              const verified = await confirmPayment({
+                data: {
+                  orderNumber: result.orderNumber,
+                  razorpayOrderId: response.razorpay_order_id,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpaySignature: response.razorpay_signature,
+                },
+              });
+              if (!verified.ok) {
+                toast.error(verified.error);
+                setBusy(false);
+                return;
+              }
+              clear();
+              toast.success("Payment successful");
+              navigate({ to: "/order-success/$orderNumber", params: { orderNumber: result.orderNumber } });
+            })();
+          },
+        });
+        rzp.open();
+        return;
+      }
+
       clear();
       toast.success("Order placed successfully");
       navigate({ to: "/order-success/$orderNumber", params: { orderNumber: result.orderNumber } });

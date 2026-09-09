@@ -27,7 +27,7 @@ const groups: { title: string; fields: { key: string; label: string; type?: "tex
     fields: [
       { key: "online_payment_enabled", label: "Enable online payment", type: "toggle" },
       { key: "payment_mode", label: "Payment mode (test / live)" },
-      { key: "razorpay_key_id", label: "Razorpay Key ID" },
+      { key: "razorpay_key_id", label: "Razorpay Key ID (for your reference — live keys are stored securely on the server)" },
     ],
   },
   {
