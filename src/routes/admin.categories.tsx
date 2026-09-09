@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { adminDeleteCategory, adminListCategories, adminSaveCategory } from "@/lib/admin.functions";
 import { slugify } from "@/lib/format";
+import { uploadMedia } from "@/lib/upload";
+
 
 export const Route = createFileRoute("/admin/categories")({
   component: CategoriesPage,
@@ -19,6 +21,8 @@ function CategoriesPage() {
     queryFn: () => adminListCategories(),
   });
   const [draft, setDraft] = useState<Draft>(blank);
+  const [uploading, setUploading] = useState(false);
+
 
   const save = useMutation({
     mutationFn: () =>
@@ -72,12 +76,46 @@ function CategoriesPage() {
           placeholder="Slug (auto)"
           className="rounded-md border border-input px-3 py-2 text-sm"
         />
-        <input
-          value={draft.image_url}
-          onChange={(e) => setDraft({ ...draft, image_url: e.target.value })}
-          placeholder="Image URL (optional)"
-          className="rounded-md border border-input px-3 py-2 text-sm sm:col-span-2"
-        />
+        <div className="sm:col-span-2">
+          <label className="text-sm font-medium">Category photo (optional)</label>
+          <div className="mt-2 flex items-center gap-3">
+            {draft.image_url ? (
+              <img src={draft.image_url} alt="Category" className="h-16 w-16 rounded-md object-cover" />
+            ) : null}
+            <input
+              type="file"
+              accept="image/*"
+              disabled={uploading}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                setUploading(true);
+                try {
+                  const url = await uploadMedia(file);
+                  setDraft((d) => ({ ...d, image_url: url }));
+                  toast.success("Photo uploaded");
+                } catch {
+                  toast.error("Could not upload that photo. Please try again.");
+                } finally {
+                  setUploading(false);
+                }
+              }}
+              className="text-sm"
+            />
+            {draft.image_url ? (
+              <button
+                type="button"
+                onClick={() => setDraft((d) => ({ ...d, image_url: "" }))}
+                className="text-sm text-destructive underline"
+              >
+                Remove
+              </button>
+            ) : null}
+          </div>
+          {uploading ? <p className="mt-2 text-xs text-muted-foreground">Uploading…</p> : null}
+        </div>
+
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} />
           Active
