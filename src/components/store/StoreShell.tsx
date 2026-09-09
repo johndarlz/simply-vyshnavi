@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Home, Menu, Search, ShoppingBag, X, Instagram, Facebook, MessageCircle, LayoutGrid } from "lucide-react";
+import { Home, Menu, Search, ShoppingBag, X, Instagram, Facebook, Youtube, MessageCircle, LayoutGrid } from "lucide-react";
 import { settingsQuery } from "@/lib/store-data";
 import { useCart } from "@/lib/cart";
 import { whatsappLink } from "@/lib/whatsapp";
@@ -176,6 +176,11 @@ function Footer() {
             {settings?.["facebook_url"] ? (
               <a href={settings["facebook_url"]} aria-label="Facebook" target="_blank" rel="noreferrer">
                 <Facebook className="h-5 w-5 text-muted-foreground hover:text-foreground" />
+              </a>
+            ) : null}
+            {settings?.["youtube_url"] ? (
+              <a href={settings["youtube_url"]} aria-label="YouTube" target="_blank" rel="noreferrer">
+                <Youtube className="h-5 w-5 text-muted-foreground hover:text-foreground" />
               </a>
             ) : null}
             {wa ? (
